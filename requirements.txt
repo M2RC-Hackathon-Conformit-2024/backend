@@ -86,3 +86,4 @@ wrapt==1.16.0
 wsproto==1.2.0
 yarl==1.16.0
 zipp==3.20.2
+peewee==3.14.4
