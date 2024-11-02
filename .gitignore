@@ -1,0 +1,10 @@
+# Ignorer l'environnement virtuel
+.venv/
+
+# Ignorer les fichiers de configuration de Chainlit
+.chainlit/
+
+# Fichiers de configuration Python
+__pycache__/
+
+.files
