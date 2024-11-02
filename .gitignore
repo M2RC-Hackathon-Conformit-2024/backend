@@ -7,4 +7,5 @@
 # Fichiers de configuration Python
 __pycache__/
 
-.files
+
+.env
