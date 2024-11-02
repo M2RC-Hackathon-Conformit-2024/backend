@@ -11,8 +11,8 @@ class BaseModel(Model): #une classe de base pour tous les models de donnees de l
 
 class User(BaseModel):
     id = IntegerField(primary_key=True)
-    name = CharField()
-    passeword = CharField()
+    email = CharField()
+    password = CharField()
 
 
 

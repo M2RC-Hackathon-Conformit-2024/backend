@@ -3,13 +3,18 @@ from langchain.prompts import ChatPromptTemplate
 from langchain.schema import StrOutputParser
 from langchain.schema.runnable import Runnable
 from langchain.schema.runnable.config import RunnableConfig
-from typing import cast
+from typing import cast, Optional, Dict
+from app import authenticate_user
 
 import chainlit as cl
 
 from dotenv import load_dotenv
 
 load_dotenv()
+
+
+#Lorsque le chat est lancer
+
 
 
 @cl.on_chat_start
@@ -32,20 +37,10 @@ async def on_chat_start():
     runnable = prompt | llm | StrOutputParser()
     cl.user_session.set("runnable", runnable)
 
-    await cl.Message(content="Connected to Chainlit!").send()
+    await cl.Message(content="Vous vous etes connectes!").send()
 
 
-@cl.password_auth_callback
-def auth_callback(username: str, password: str):
-    # Fetch the user matching username from your database
-    # and compare the hashed password with the value stored in the database
-    if (username, password) == ("admin", "admin"):
-        return cl.User(
-            identifier="admin", metadata={"role": "admin", "provider": "credentials"}
-        )
-    else:
-        return None
-
+#la fonction qui suit sera exécutée chaque fois qu'un nouveau message est reçu de l'utilisateur pendant la conversation.
 @cl.on_message
 async def on_message(message: cl.Message):
     runnable = cast(Runnable, cl.user_session.get(
@@ -60,3 +55,6 @@ async def on_message(message: cl.Message):
         await msg.stream_token(chunk)
 
     await msg.send()
+
+
+
