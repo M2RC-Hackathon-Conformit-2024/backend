@@ -5,9 +5,15 @@ from langchain.schema.runnable import Runnable
 from langchain.schema.runnable.config import RunnableConfig
 from typing import cast
 from context import session_user_cache  # Importe la variable de contexte
-
+import argparse
+# from dataclasses import dataclass
+from langchain_community.vectorstores import Chroma
+from langchain_openai import OpenAIEmbeddings
+from langchain_openai import ChatOpenAI
+from langchain.prompts import ChatPromptTemplate
+import openai
 import chainlit as cl
-
+import os
 from dotenv import load_dotenv
 import random
 import string
@@ -15,7 +21,14 @@ from model import conversation_history,current_user
 
 load_dotenv()
 
+openai.api_key = os.environ['OPENAI_API_KEY']
+CHROMA_PATH = "chroma"
+
 discusion = [("system","You are a helpful assistant."),("human", "{question}")]
+
+# Prepare the DB.
+embedding_function = OpenAIEmbeddings()
+db = Chroma(persist_directory=CHROMA_PATH, embedding_function=embedding_function)
 
 def generate_random_id(length=8):
     characters = string.ascii_letters + string.digits  # Lettres (majuscules et minuscules) + chiffres
@@ -59,8 +72,12 @@ async def on_message(message: cl.Message):
 
     # Ajoute le nouveau message de l'utilisateur dans l'historique
     history.append(("human", message.content))
-
-        # Enregistre le message dans la base de données
+    # Search the DB.
+    results = db.similarity_search_with_relevance_scores(message.content, k=5)
+    if len(results) == 0 or results[0][1] < 0.7:
+        pass
+    context_text = "\n\n---\n\n".join([doc.page_content for doc, _score in results])
+    # Enregistre le message dans la base de données
     conversation_history.create(
         id_user = id_user,
         session_id = session_id, 
@@ -69,10 +86,19 @@ async def on_message(message: cl.Message):
 
     # Formate l'historique pour l'inclure dans le prompt
     conversation = "\n".join(f"{role}: {text}" for role, text in history)
+    #mettre le contexte ici
+    modified_user_message = f"""
+    Use only the following context to answer the question without mentioning the context in your answer.
+
+    Context: "{context_text}"
+
+    Question: {message.content}
+    Answer:
+    """
     msg = cl.Message(content="")
 
     async for chunk in runnable.astream(
-        {"conversation": conversation,"question": message.content},
+        {"conversation": conversation,"question": modified_user_message},
         config=RunnableConfig(callbacks=[cl.LangchainCallbackHandler()]),
     ):
         await msg.stream_token(chunk)
