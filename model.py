@@ -14,11 +14,21 @@ class User(BaseModel):
     email = CharField()
     password = CharField()
 
+class conversation_history(BaseModel):
+    id = IntegerField(primary_key=True)
+    id_user = IntegerField()
+    session_id = CharField()
+    role = CharField()
+    message = CharField(max_length=750)
+
+class current_user(BaseModel):
+    id = IntegerField(primary_key=True)
+    user_id = IntegerField()
 
 
 
 def init_db_command():
-    mesModeles = [User]
+    mesModeles = [User,conversation_history,current_user]
     database = SqliteDatabase(get_db_path())
     try:
         database.create_tables(mesModeles)

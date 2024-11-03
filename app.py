@@ -1,6 +1,8 @@
 import os
+import chainlit as cl
 from fastapi import WebSocket
 import jwt
+from uuid import uuid4
 from chainlit.config import config
 from typing import Any, Dict
 from fastapi.security import OAuth2PasswordBearer
@@ -12,14 +14,16 @@ from chainlit.auth import create_jwt
 from chainlit.oauth_providers import get_configured_oauth_providers
 from chainlit.user import User
 from chainlit.utils import mount_chainlit
-
+from context import session_user_cache  # Importe la variable de contexte
+from peewee import fn
 from dotenv import load_dotenv
 
-from model import init_db_command, User as Users
+from model import init_db_command, User as Users , current_user, conversation_history as cs
 load_dotenv()
 
 app = FastAPI()
 init_db_command()
+
 
 reuseable_oauth = OAuth2PasswordBearer(tokenUrl="/login", auto_error=False)
 SECRET_KEY = os.getenv("CHAINLIT_AUTH_SECRET")
@@ -32,14 +36,6 @@ app.add_middleware(
     allow_methods=["*"],  # Allows all methods
     allow_headers=["*"],  # Allows all headers
 )
-
-
-@app.get("/custom-auth")
-async def custom_auth():
-    # Verify the user's identity with custom logic.
-
-    token = create_jwt(User(identifier="Test User"))
-    return JSONResponse({"token": token})
 
 @app.post("/register")
 async def register(request: Request):
@@ -69,6 +65,8 @@ async def login(request: Request):
     except:
         response = JSONResponse({"code":422})
     return response
+
+
 
 
 
@@ -103,12 +101,6 @@ async def authenticate_user(request: Request):
 
 
 
-@app.get("/custom-auth")
-async def custom_auth():
-    # Verify the user's identity with custom logic.
-    token = create_jwt(User(identifier="Test User"))
-    return JSONResponse({"token": token})
-
 '''
 # Montée sécurisée de Chainlit avec le middleware de vérification du token
 @app.middleware("http")
@@ -121,21 +113,59 @@ async def token_verification_middleware(request: Request, call_next):
         response = await call_next(request)
     return response
 '''
+
+@app.get("/get_conversation")
+async def getConversation(request: Request):
+    user = await authenticate_user(request)
+    if user is None:
+        return JSONResponse({"code":401})
+    else:
+        try:
+            user_m = Users.get(Users.email == user.identifier)
+            id_user = user_m.id
+            subquery = (cs.select(cs.id_user, cs.session_id, fn.MIN(cs.id).alias('min_id'))
+                        .where(cs.id_user == id_user)
+                        .group_by(cs.id_user, cs.session_id))
+            query = (cs.select().join(subquery, on=(cs.id == subquery.c.min_id)))
+            response = []
+            for row in query.dicts():
+                response.append(row)
+            return JSONResponse(response)
+        except:
+            return JSONResponse({"code":401})
+
+@app.get("/get_conversations/{session_id}")
+async def get_conversations(session_id: str, request: Request):
+    user = await authenticate_user(request)
+    if user is None:
+        return JSONResponse({"code":401})
+    else:
+        try:
+            user_m = Users.get(Users.email == user.identifier)
+            id_user = user_m.id
+            query = cs.select().where(cs.id_user == id_user and cs.session_id == session_id)
+            response = []
+            for row in query.dicts():
+                response.append(row)
+            return JSONResponse(response)
+        except:
+            return JSONResponse({"code":401})
+
 @app.middleware("http")
 async def token_verification_middleware(request: Request, call_next):
     # Laisse passer toutes les requêtes OPTIONS sans vérification de token (nécessaire pour CORS)
     if request.method == "OPTIONS":
         return await call_next(request)
-    
-    # Si la requête est une connexion WebSocket, laisse-la passer sans vérification de token
-    #if request.url.path.startswith("/chainlit/ws/socket.io"):
-    #    return await call_next(request)
 
-    # Pour toutes les autres requêtes HTTP, vérifie le token
+    # Vérifie le token pour toutes les autres requêtes
     user = await authenticate_user(request)
     if user is None and request.url.path.startswith("/chainlit"):
         return JSONResponse({"code": 401})
-    
+    try:
+        user_m = Users.get(Users.email == user.identifier)
+        current_user.create(user_id = user_m.id)
+    except:
+        print(user.identifier)
     return await call_next(request)
 
 
