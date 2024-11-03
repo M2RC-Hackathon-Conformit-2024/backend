@@ -68,7 +68,6 @@ async def on_message(message: cl.Message):
     history = cl.user_session.get("history")
     session_id = cl.user_session.get("session_id")
     id_user = cl.user_session.get("id_user")
-    print(id_user)
 
     # Ajoute le nouveau message de l'utilisateur dans l'historique
     history.append(("human", message.content))

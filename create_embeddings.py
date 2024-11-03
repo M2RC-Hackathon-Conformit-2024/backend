@@ -41,7 +41,6 @@ def split_text(documents: list[Document]):
         add_start_index=True,
     )
     chunks = text_splitter.split_documents(documents)
-    print(f"Split {len(documents)} documents into {len(chunks)} chunks.")
 
     # Affiche le contenu et les métadonnées du 10e chunk, ou le premier si moins de 10
 

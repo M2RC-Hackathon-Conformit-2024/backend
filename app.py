@@ -40,7 +40,6 @@ app.add_middleware(
 @app.post("/register")
 async def register(request: Request):
     body =await request.json()
-    print(body)
     try:
         Users.create(
             email = body["email"],
@@ -48,8 +47,7 @@ async def register(request: Request):
         )
         response = JSONResponse({"code":200})
     except Exception as e:
-        print(e)
-        response = JSONResponse({"code":422})
+        response = JSONResponse(status_code=422,content="Unprocessable Entity")
     return response
 
 @app.post("/login")
@@ -61,9 +59,9 @@ async def login(request: Request):
             token = create_jwt(User(identifier=user.email))
             response = JSONResponse({"code":200, "token":token})
         else:
-            response = JSONResponse({"code":422})
+            response = JSONResponse(status_code=401,content="Unauthorized")
     except:
-        response = JSONResponse({"code":422})
+        response = JSONResponse(status_code=401,content="Unauthorized")
     return response
 
 
@@ -73,7 +71,6 @@ async def login(request: Request):
 async def authenticate_user(request: Request):
     # Passez la requête au reuseable_oauth
     token = await reuseable_oauth(request)  # Appel avec l'objet request
-    print("Le token est: ", token)
     try:
         dict = jwt.decode(
             token,
@@ -101,24 +98,12 @@ async def authenticate_user(request: Request):
 
 
 
-'''
-# Montée sécurisée de Chainlit avec le middleware de vérification du token
-@app.middleware("http")
-async def token_verification_middleware(request: Request, call_next):
-    user = await authenticate_user(request)  # Passez la requête ici aussi
-    if user is None and request.url.path.startswith("/chainlit"):
-        response = JSONResponse({"code": 401})
-        #response = await call_next(request)
-    else:
-        response = await call_next(request)
-    return response
-'''
 
 @app.get("/get_conversation")
 async def getConversation(request: Request):
     user = await authenticate_user(request)
     if user is None:
-        return JSONResponse({"code":401})
+        return JSONResponse(status_code=401,content="Unauthorized")
     else:
         try:
             user_m = Users.get(Users.email == user.identifier)
@@ -132,13 +117,13 @@ async def getConversation(request: Request):
                 response.append(row)
             return JSONResponse(response)
         except:
-            return JSONResponse({"code":401})
+            return JSONResponse(status_code=401,content="Unauthorized")
 
 @app.get("/get_conversations/{session_id}")
 async def get_conversations(session_id: str, request: Request):
     user = await authenticate_user(request)
     if user is None:
-        return JSONResponse({"code":401})
+        return JSONResponse(status_code=401,content="Unauthorized")
     else:
         try:
             user_m = Users.get(Users.email == user.identifier)
@@ -160,13 +145,13 @@ async def token_verification_middleware(request: Request, call_next):
     # Vérifie le token pour toutes les autres requêtes
     user = await authenticate_user(request)
     if user is None and request.url.path.startswith("/chainlit"):
-        return JSONResponse({"code": 401})
+        return JSONResponse(status_code=401,content="Unauthorized")
     if request.url.path.startswith("/chainlit"):
         try:
             user_m = Users.get(Users.email == user.identifier)
             current_user.create(user_id = user_m.id)
         except:
-            print(user.identifier)
+            return JSONResponse(status_code=500,content="Internal Server Error ")
     return await call_next(request)
 
 
