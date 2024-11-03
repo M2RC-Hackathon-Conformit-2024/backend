@@ -40,26 +40,28 @@ async def custom_auth():
     token = create_jwt(User(identifier="Test User"))
     return JSONResponse({"token": token})
 
+@app.post("/register")
+async def register(request: Request):
+    body =await request.json()
+    print(body)
+    try:
+        Users.create(
+            email = body["email"],
+            password = body["password"]
+        )
+        response = JSONResponse({"code":200})
+    except Exception as e:
+        print(e)
+        response = JSONResponse({"code":422})
+    return response
+
 @app.post("/login")
 async def login(request: Request):
     body =await request.json()
     try:
-        Users.create(
-            name = body["name"],
-            password = body["password"]
-        )
-        response = JSONResponse({"code":200})
-    except:
-        response = JSONResponse({"code":422})
-    return response
-
-@app.post("/signIn")
-async def signIn(request: Request):
-    body =await request.json()
-    try:
-        user = Users.get(Users.name == body["name"])
+        user = Users.get(Users.email == body["email"])
         if(user.password == body["password"]):
-            token = create_jwt(User(identifier=user.name))
+            token = create_jwt(User(identifier=user.email))
             response = JSONResponse({"code":200, "token":token})
         else:
             response = JSONResponse({"code":422})
