@@ -161,11 +161,12 @@ async def token_verification_middleware(request: Request, call_next):
     user = await authenticate_user(request)
     if user is None and request.url.path.startswith("/chainlit"):
         return JSONResponse({"code": 401})
-    try:
-        user_m = Users.get(Users.email == user.identifier)
-        current_user.create(user_id = user_m.id)
-    except:
-        print(user.identifier)
+    if request.url.path.startswith("/chainlit"):
+        try:
+            user_m = Users.get(Users.email == user.identifier)
+            current_user.create(user_id = user_m.id)
+        except:
+            print(user.identifier)
     return await call_next(request)
 
 
