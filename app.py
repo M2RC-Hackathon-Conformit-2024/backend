@@ -1,4 +1,5 @@
 import os
+from fastapi import WebSocket
 import jwt
 from chainlit.config import config
 from typing import Any, Dict
@@ -26,7 +27,7 @@ ALGORITHM = "HS256"
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*", "http://localhost:5173"],  # Allows all origins
+    allow_origins=["*", "http://localhost:5173", "http://localhost/chainlit/ws/socket.io"],
     allow_credentials=True,
     allow_methods=["*"],  # Allows all methods
     allow_headers=["*"],  # Allows all headers
@@ -74,7 +75,7 @@ async def login(request: Request):
 async def authenticate_user(request: Request):
     # Passez la requête au reuseable_oauth
     token = await reuseable_oauth(request)  # Appel avec l'objet request
-    print("je suis passer par la")
+    print("Le token est: ", token)
     try:
         dict = jwt.decode(
             token,
@@ -85,10 +86,8 @@ async def authenticate_user(request: Request):
         del dict["exp"]
         user = User(**dict)
     except Exception as e:
-        print("la aussi")
         user = None
     if data_layer := get_data_layer():
-        print("la aussi")
         try:
             persisted_user = await data_layer.get_user(user.identifier)
             if persisted_user is None:
@@ -110,14 +109,34 @@ async def custom_auth():
     token = create_jwt(User(identifier="Test User"))
     return JSONResponse({"token": token})
 
+'''
 # Montée sécurisée de Chainlit avec le middleware de vérification du token
 @app.middleware("http")
 async def token_verification_middleware(request: Request, call_next):
     user = await authenticate_user(request)  # Passez la requête ici aussi
     if user is None and request.url.path.startswith("/chainlit"):
         response = JSONResponse({"code": 401})
+        #response = await call_next(request)
     else:
         response = await call_next(request)
     return response
+'''
+@app.middleware("http")
+async def token_verification_middleware(request: Request, call_next):
+    # Laisse passer toutes les requêtes OPTIONS sans vérification de token (nécessaire pour CORS)
+    if request.method == "OPTIONS":
+        return await call_next(request)
+    
+    # Si la requête est une connexion WebSocket, laisse-la passer sans vérification de token
+    #if request.url.path.startswith("/chainlit/ws/socket.io"):
+    #    return await call_next(request)
+
+    # Pour toutes les autres requêtes HTTP, vérifie le token
+    user = await authenticate_user(request)
+    if user is None and request.url.path.startswith("/chainlit"):
+        return JSONResponse({"code": 401})
+    
+    return await call_next(request)
+
 
 mount_chainlit(app=app, target="cl_app.py", path="/chainlit")
