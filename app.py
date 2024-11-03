@@ -112,10 +112,10 @@ async def custom_auth():
 @app.middleware("http")
 async def token_verification_middleware(request: Request, call_next):
     user = await authenticate_user(request)  # Passez la requête ici aussi
-    if user is not None and request.url.path.startswith("/chainlit"):
-            response = await call_next(request)
-    else:
+    if user is None and request.url.path.startswith("/chainlit"):
         response = JSONResponse({"code": 401})
+    else:
+        response = await call_next(request)
     return response
 
 mount_chainlit(app=app, target="cl_app.py", path="/chainlit")
